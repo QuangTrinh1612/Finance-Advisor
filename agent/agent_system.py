@@ -1,7 +1,6 @@
 from agent.finance_agent import FinanceAgent
 from agent.meta_agent import MetaAgent
 import json
-from util.config import Config
 from util.callbacks import StreamingHandler
 
 class ExpertSystem:
@@ -61,59 +60,3 @@ class ExpertSystem:
                 "type": "system_error"
             }
         }, indent=2)
-
-def select_model():
-    """Allow user to select model provider"""
-    print("\nSelect Model Provider:")
-    print("1. Local (Ollama LLaMA 3.2)")
-    print("2. Groq (LLaMA 3.2 90B)")
-    
-    while True:
-        choice = input("\nEnter choice (1 or 2): ").strip()
-        if choice == "1":
-            Config.model_config.provider = "ollama"
-            Config.model_config.model_name = "hermes-3-llama-3.2-3b"
-            break
-        elif choice == "2":
-            Config.model_config.provider = "groq"
-            Config.model_config.model_name = Config.model_config.groq_model_name
-            if not Config.model_config.groq_api_key:
-                print("Error: GROQ_API_KEY not found in environment variables")
-                continue
-            break
-        else:
-            print("Invalid choice. Please enter 1 or 2.")
-
-def main():
-    print("Initializing Expert System...")
-    
-    # Add model selection before system initialization
-    select_model()
-    
-    system = ExpertSystem()
-    
-    print("System Ready!")
-    print("Available Agents:", system.meta_agent.registry.list_agents())
-    print("\nEnter your questions (type 'exit' to quit)")
-    
-    # Main interaction loop
-    while True:
-        try:
-            query = input("\nQuery: ")
-            if query.lower() == 'exit':
-                print("Shutting down Expert Agent System...")
-                break
-                
-            response = system.process_query(query)
-            if response:  # Only print if there's an error
-                print("\nResponse:")
-                print(response)
-            
-        except KeyboardInterrupt:
-            print("\nShutting down Expert Agent System...")
-            break
-        except Exception as e:
-            print(f"\nError: {str(e)}")
-
-if __name__ == "__main__":
-    main()
