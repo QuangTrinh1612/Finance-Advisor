@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from langchain_openai import ChatOpenAI
 from langchain.schema.messages import HumanMessage
-from utils.config import Config
+from util.config import Config
 
 class BaseAgent(ABC):
     def __init__(self, name: str, callbacks=None):
