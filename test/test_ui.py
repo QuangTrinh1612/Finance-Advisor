@@ -1,87 +1,59 @@
+import streamlit as st
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
-from langchain.schema.messages import HumanMessage
-import chainlit as cl
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 
-system_instruction = """
-You are Zomato OrderBot, \
-an automated service to collect orders for an online restaurant. \
-You first greet the customer, then collects the order, \
-and then asks if it's a pickup or delivery. \
-You wait to collect the entire order, then summarize it and check for a final \
-time if the customer wants to add anything else. \
-If it's a delivery, you ask for an address. \
-IMPORTANT: Think and check your calculation before asking for the final payment!
-Finally you collect the payment.\
-Make sure to clarify all options, extras and sizes to uniquely \
-identify the item from the menu.\
-You respond in a short, very conversational friendly style. \
-The menu includes:- \
+# app config
+st.set_page_config(page_title="LM Studio Streaming Chatbot", page_icon="🤖")
+st.title("LM Studio Streaming Chatbot")
 
-# Zomato Menu
+def get_response(user_query, chat_history):
 
-## Pizzas
+    template = """
+    You are a helpful assistant in Finance Market. Answer the following questions considering the history of the conversation:
 
-- Cheese Pizza (12 inch) - $9.99
-- Pepperoni Pizza (12 inch) - $10.99
-- Hawaiian Pizza (12 inch) - $11.99
-- Veggie Pizza (12 inch) - $10.99
-- Meat Lovers Pizza (12 inch) - $12.99
-- Margherita Pizza (12 inch) - $9.99
+    Chat history: {chat_history}
 
-## Pasta and Noodles
+    User question: {user_question}
+    """
 
-- Spaghetti and Meatballs - $10.99
-- Lasagna - $11.99
-- Macaroni and Cheese - $8.99
-- Chicken and Broccoli Pasta - $10.99
-- Chow Mein - $9.99
+    prompt = ChatPromptTemplate.from_template(template)
 
-## Asian Cuisine
+    # Using LM Studio Local Inference Server
+    llm = ChatOpenAI(base_url="http://localhost:1234/v1", api_key="not-needed")
 
-- Chicken Fried Rice - $8.99
-- Sushi Platter (12 pcs) - $14.99
-- Curry Chicken with Rice - $9.99
+    chain = prompt | llm | StrOutputParser()
+    
+    return chain.stream({
+        "chat_history": chat_history,
+        "user_question": user_query,
+    })
 
-## Beverages
+# session state
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = [
+        AIMessage(content="Hello, I am a bot. How can I help you?"),
+    ]
 
-- Coke, Sprite, Fanta, or Diet Coke (Can) -$1.5 0
-- Water Bottle -$1.00
-- Juice Box (Apple, Orange, or Cranberry) -$1.50
-- Milkshake (Chocolate, Vanilla, or Strawberry) -$3.99
-- Smoothie (Mango, Berry, or Banana) -$4.99
-- Coffee (Regular or Decaf) -$2.00
-- Hot Tea (Green, Black, or Herbal) -$2.00
+# conversation
+for message in st.session_state.chat_history:
+    if isinstance(message, AIMessage):
+        with st.chat_message("AI"):
+            st.write(message.content)
+    elif isinstance(message, HumanMessage):
+        with st.chat_message("Human"):
+            st.write(message.content)
 
-## Indian Cuisine
+# user input
+user_query = st.chat_input("Type your message here...")
+if user_query is not None and user_query != "":
+    st.session_state.chat_history.append(HumanMessage(content=user_query))
 
-- Butter Chicken with Naan Bread - $11.99
-- Chicken Tikka Masala with Rice - $10.99
-- Palak Paneer with Paratha - $9.99
-- Chana Masala with Poori - $8.99
-- Vegetable Biryani - $9.99
-- Samosa (2 pcs) - $4.99
-- Lassi (Mango, Rose, or Salted) - $3.99
-"""
+    with st.chat_message("Human"):
+        st.markdown(user_query)
 
-messages = [
-    {"role": "system", "content": system_instruction}
-]
+    with st.chat_message("AI"):
+        response = st.write_stream(get_response(user_query, st.session_state.chat_history))
 
-def ask_order(messages):
-    llm = ChatOpenAI(
-        base_url="http://localhost:1234/v1",
-        api_key="not-needed"
-    )
-    response = llm(messages)
-    return response.content
-
-@cl.on_message
-async def main(message: cl.Message):
-    messages.append({"role": "user", "content": message.content})
-    response = ask_order(messages)
-    messages.append({"role": "assistant", "content": response})
-
-    # Send a response back to the user
-    await cl.Message(
-        content=response,
-    ).send()
+    st.session_state.chat_history.append(AIMessage(content=response))
